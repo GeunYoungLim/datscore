@@ -1,10 +1,11 @@
 import asyncio
 import pickle as pk
 import multiprocessing as mp
-
+from datetime import datetime
+import atexit
 
 def _event_loop_run(io_handle, url, port):
-    event_loop = asyncio.get_event_loop()
+    event_loop = asyncio.new_event_loop()
     async_start = asyncio.start_server(io_handle, url, port, loop=event_loop)
     event_loop.run_until_complete(async_start)
     event_loop.run_forever()
@@ -42,6 +43,8 @@ class RemoteController(object):
         self._proc = None
         self._command_queue = mp.Queue()
         self._ctx = mp.get_context('fork')
+        self._last_flush = datetime.now()
+        atexit.register(self.stop)
 
     def start(self):
         self._proc = self._ctx.Process(target=_event_loop_run, args=(self._io_handle, self._url, self._port))
@@ -51,9 +54,9 @@ class RemoteController(object):
         self._proc.join()
 
     def push_command(self, cmd):
-        if self._command_queue.full():
-            while not self._command_queue.empty():
-                self._command_queue.get()
+
+        while not self._command_queue.empty():
+            self._command_queue.get()
         self._command_queue.put(cmd)
 
     async def _io_handle(self, reader, writer):
@@ -61,7 +64,7 @@ class RemoteController(object):
             data = await reader.read(128)
             cmd_builder = self.Command(self._statbytes)
 
-            result = cmd_builder([0, 1, 0]) if self._command_queue.empty() else self._command_queue.get()
+            result = cmd_builder([0xD, 0xE, 0xA, 0xD]) if self._command_queue.empty() else self._command_queue.get()
 
             if type(result) is not self.Command:
                 raise RuntimeError('Invalid Command Error.')

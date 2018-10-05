@@ -1,5 +1,5 @@
 import argparse
-import cv2
+import atexit
 
 from server.control import RemoteController
 from server.stream import StreamReceiver
@@ -12,9 +12,7 @@ import multiprocessing as mp
 def driving_ai_logic(config):
     rc = RemoteController(config.service, config.vision, 32)
     rc.start()
-
     model = DriveModel(rc)
-
     sr = StreamReceiver(config.service, config.ctrl)
     sr.set_recv_callback(model.predict)
     sr.open()
@@ -23,11 +21,8 @@ def driving_ai_logic(config):
 def object_detaction_logic(config):
     rc = RemoteController(config.service, config.obj, 32)
     rc.start()
-
     model = DetectionModel(rc)
-
     sr = StreamReceiver(config.service, config.react)
-
     sr.set_recv_callback(model.predict)
     sr.open()
 
@@ -46,4 +41,12 @@ if __name__ == '__main__':
     driving_ai_process = ctx.Process(target=driving_ai_logic, args=(config,))
     object_detection_process = ctx.Process(target=object_detaction_logic, args=(config,))
     driving_ai_process.start()
-    object_detection_process.start()
+    #object_detection_process.start()
+
+
+    def wait_process():
+        print('waiting other process.')
+        driving_ai_process.join()
+        #object_detection_process.join()
+
+    atexit.register()

@@ -2,6 +2,7 @@ import cv2
 import multiprocessing as mp
 import time
 
+import atexit
 
 def _opencv_capture(target_url, stop_flag, frame_queue: mp.Queue):
     cap = cv2.VideoCapture(target_url)
@@ -18,7 +19,6 @@ class StreamReceiver(object):
     def __init__(self, url, port, processing_method ='fork'):
         base_url = 'udp://{address}:{port}'
         base_url = base_url.format(address=url, port=port)
-
         self._url = base_url
 
         self._stop_flag = mp.Value('i', False)
@@ -27,6 +27,7 @@ class StreamReceiver(object):
         self._ctx = mp.get_context(processing_method)
 
         self._recv_callback = None
+        atexit.register(self.close)
 
     def set_recv_callback(self, recv_callback):
         self._recv_callback = recv_callback
@@ -46,11 +47,12 @@ class StreamReceiver(object):
 
             while not self._frame_queue.empty():
                 self._frame_queue.get()
-
+        print('waiting for other process.')
         cap_proc.join()
         self._stop_flag.value = False
 
     def close(self):
+
         self._stop_flag.value = True
 
 
